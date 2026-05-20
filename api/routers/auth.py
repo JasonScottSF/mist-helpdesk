@@ -100,8 +100,8 @@ async def mfa(req: MfaRequest, response: Response):
         raise HTTPException(status_code=401, detail="Invalid MFA code")
 
     self_data = await mist_client.get_self(rs, cloud)
-    if not self_data.get("two_factor_passed"):
-        raise HTTPException(status_code=401, detail="MFA verification failed")
+    if self_data.get("two_factor_required") and not self_data.get("two_factor_passed"):
+        raise HTTPException(status_code=401, detail="Invalid verification code")
 
     orgs = mist_client.parse_orgs(self_data)
     if not orgs:
