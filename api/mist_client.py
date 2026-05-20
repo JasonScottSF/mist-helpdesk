@@ -132,12 +132,9 @@ async def get_wired_clients(rs, cloud_host, org_id, site_id):
 
 
 def _sync_troubleshoot(rs: requests.Session, cloud_host: str, org_id: str, params: dict) -> dict:
-    r = rs.get(mist_url(cloud_host, f"/orgs/{org_id}/troubleshoot"), params=params, timeout=30)
+    r = rs.get(mist_url(cloud_host, f"/orgs/{org_id}/insights/troubleshoot"), params=params, timeout=30)
     r.raise_for_status()
-    ct = r.headers.get("content-type", "")
-    if "json" in ct:
-        return r.json()
-    return {"text": r.text}
+    return r.json()
 
 
 async def marvis_troubleshoot(rs, cloud_host, org_id, params: dict):

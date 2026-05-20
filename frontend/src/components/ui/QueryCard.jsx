@@ -16,9 +16,15 @@ function buildDisplayQuery(type, mac, siteName) {
 function formatResult(result) {
   if (!result) return ''
   if (typeof result === 'string') return result
-  if (result.text)    return result.text
+  // Mist insights/troubleshoot: {data: {results: [{category, text}]}}
+  const rows = result?.data?.results
+  if (Array.isArray(rows)) {
+    if (rows.length === 0) return 'No issues found.'
+    return rows.map(r => r.category ? `[${r.category}]\n${r.text}` : r.text).join('\n\n')
+  }
+  if (result.text)     return result.text
   if (result.response) return result.response
-  if (result.message) return result.message
+  if (result.message)  return result.message
   return JSON.stringify(result, null, 2)
 }
 

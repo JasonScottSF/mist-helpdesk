@@ -12,7 +12,11 @@ async function request(method, path, body) {
   }
   const r = await fetch(`${BASE}${path}`, opts)
   const data = await r.json()
-  if (!r.ok) throw new Error(data.detail || `HTTP ${r.status}`)
+  if (!r.ok) {
+    const detail = data.detail
+    const msg = typeof detail === 'string' ? detail : JSON.stringify(detail) || `HTTP ${r.status}`
+    throw new Error(msg)
+  }
   return data
 }
 
