@@ -119,5 +119,14 @@ async def get_wired_clients(rs, cloud_host, site_id):
     return data if isinstance(data, list) else data.get("results", [])
 
 
-async def marvis_query(rs, cloud_host, org_id, query):
-    return await api_post(rs, cloud_host, f"/orgs/{org_id}/marvis", {"query": query})
+def _sync_troubleshoot(rs: requests.Session, cloud_host: str, org_id: str, params: dict) -> dict:
+    r = rs.get(mist_url(cloud_host, f"/orgs/{org_id}/troubleshoot"), params=params, timeout=30)
+    r.raise_for_status()
+    ct = r.headers.get("content-type", "")
+    if "json" in ct:
+        return r.json()
+    return {"text": r.text}
+
+
+async def marvis_troubleshoot(rs, cloud_host, org_id, params: dict):
+    return await _run(_sync_troubleshoot, rs, cloud_host, org_id, params)

@@ -9,14 +9,13 @@ router = APIRouter()
 
 
 class QueryRequest(BaseModel):
-    query: str
+    troubleshoot_type: str          # "client", "wireless", "wired", "wan"
+    mac:     Optional[str] = None   # required for troubleshoot_type="client"
+    site_id: Optional[str] = None   # required for wireless/wired/wan
 
 
 class SuggestionsRequest(BaseModel):
     category_id: str
-    client: Optional[str] = None
-    site: Optional[str] = None
-    timeframe: Optional[str] = "today"
 
 
 def _require_session(hd_session: Optional[str]):
@@ -35,8 +34,21 @@ async def query(req: QueryRequest, hd_session: Optional[str] = Cookie(None)):
     sess = _require_session(hd_session)
     rs = sess["requests_session"]
     cloud = sess["cloud_host"]
+
+    params = {}
+    if req.troubleshoot_type == "client":
+        if not req.mac:
+            raise HTTPException(status_code=400, detail="mac is required for client troubleshoot")
+        params["mac"] = req.mac
+    else:
+        if not req.site_id:
+            raise HTTPException(status_code=400, detail="site_id is required for site troubleshoot")
+        params["site_id"] = req.site_id
+        if req.troubleshoot_type in ("wired", "wan"):
+            params["type"] = req.troubleshoot_type
+
     try:
-        result = await mist_client.marvis_query(rs, cloud, sess["org_id"], req.query)
+        result = await mist_client.marvis_troubleshoot(rs, cloud, sess["org_id"], params)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Marvis error: {e}")
     return result
@@ -44,12 +56,7 @@ async def query(req: QueryRequest, hd_session: Optional[str] = Cookie(None)):
 
 @router.post("/suggestions")
 async def suggestions(req: SuggestionsRequest):
-    queries = get_suggested_queries(
-        req.category_id,
-        client=req.client,
-        site=req.site,
-        timeframe=req.timeframe,
-    )
+    queries = get_suggested_queries(req.category_id)
     escalation = ESCALATION_GUIDANCE.get(req.category_id)
     return {"queries": queries, "escalation_guidance": escalation}
 
