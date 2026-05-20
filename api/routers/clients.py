@@ -7,7 +7,7 @@ router = APIRouter()
 
 WIRELESS_FIELDS = ["mac", "ip", "hostname", "username", "family", "os", "model",
                    "ap_mac", "ssid", "rssi", "uptime", "last_seen"]
-WIRED_FIELDS    = ["mac", "ip", "hostname", "port_id", "vlan_id", "uptime", "last_seen"]
+WIRED_FIELDS    = ["mac", "ip", "hostname", "port_id", "vlan_id", "vlan_name", "manufacture"]
 
 
 def _require_session(hd_session: Optional[str]):
@@ -41,7 +41,7 @@ async def wired_clients(site_id: str, hd_session: Optional[str] = Cookie(None)):
     rs = sess["requests_session"]
     cloud = sess["cloud_host"]
     try:
-        clients = await mist_client.get_wired_clients(rs, cloud, site_id)
+        clients = await mist_client.get_wired_clients(rs, cloud, sess["org_id"], site_id)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Mist API error: {e}")
     return {"clients": [_slim(c, WIRED_FIELDS) for c in clients]}

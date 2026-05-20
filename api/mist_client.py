@@ -114,9 +114,21 @@ async def get_wireless_clients(rs, cloud_host, site_id):
     return data if isinstance(data, list) else data.get("results", [])
 
 
-async def get_wired_clients(rs, cloud_host, site_id):
-    data = await api_get(rs, cloud_host, f"/sites/{site_id}/stats/wired_clients")
-    return data if isinstance(data, list) else data.get("results", [])
+async def get_wired_clients(rs, cloud_host, org_id, site_id):
+    data = await api_get(rs, cloud_host, f"/orgs/{org_id}/wired_clients/search?site_id={site_id}&limit=100")
+    raw = data.get("results", []) if isinstance(data, dict) else data
+    return [
+        {
+            "mac":       c.get("mac"),
+            "ip":        (c.get("ip") or [None])[0],
+            "hostname":  (c.get("hostname") or [None])[0],
+            "port_id":   c.get("last_port_id"),
+            "vlan_id":   c.get("last_vlan"),
+            "vlan_name": c.get("last_vlan_name"),
+            "manufacture": c.get("manufacture"),
+        }
+        for c in raw
+    ]
 
 
 def _sync_troubleshoot(rs: requests.Session, cloud_host: str, org_id: str, params: dict) -> dict:
