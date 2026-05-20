@@ -42,7 +42,7 @@ export const clients = {
 }
 
 export const marvis = {
-  query:       (query)  => post('/marvis/query',       { query }),
+  query:       (params) => post('/marvis/query',       params),
   suggestions: (params) => post('/marvis/suggestions', params),
   categories:  ()       => get('/marvis/categories'),
 }
