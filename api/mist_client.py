@@ -110,12 +110,12 @@ async def get_sites(rs, cloud_host, org_id):
 
 
 async def get_wireless_clients(rs, cloud_host, site_id):
-    data = await api_get(rs, cloud_host, f"/sites/{site_id}/clients")
+    data = await api_get(rs, cloud_host, f"/sites/{site_id}/stats/clients")
     return data if isinstance(data, list) else data.get("results", [])
 
 
 async def get_wired_clients(rs, cloud_host, site_id):
-    data = await api_get(rs, cloud_host, f"/sites/{site_id}/wired_clients")
+    data = await api_get(rs, cloud_host, f"/sites/{site_id}/stats/wired_clients")
     return data if isinstance(data, list) else data.get("results", [])
 
 
