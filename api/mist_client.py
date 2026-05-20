@@ -120,4 +120,4 @@ async def get_wired_clients(rs, cloud_host, site_id):
 
 
 async def marvis_query(rs, cloud_host, org_id, query):
-    return await api_post(rs, cloud_host, f"/orgs/{org_id}/marvis/search", {"query": query})
+    return await api_post(rs, cloud_host, f"/orgs/{org_id}/marvis", {"query": query})
