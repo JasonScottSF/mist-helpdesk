@@ -133,12 +133,11 @@ async def get_wired_clients(rs, cloud_host, org_id, site_id):
 
 def _sync_troubleshoot(rs: requests.Session, cloud_host: str, org_id: str,
                        troubleshoot_type: str, mac: str = None, site_id: str = None) -> dict:
+    url = mist_url(cloud_host, f"/orgs/{org_id}/troubleshoot")
     if troubleshoot_type == "client":
-        url = mist_url(cloud_host, f"/orgs/{org_id}/troubleshoot")
         params = {"mac": mac}
     else:
-        url = mist_url(cloud_host, f"/sites/{site_id}/troubleshoot")
-        params = {}
+        params = {"site_id": site_id}
         if troubleshoot_type in ("wired", "wan"):
             params["type"] = troubleshoot_type
     r = rs.get(url, params=params, timeout=30)
