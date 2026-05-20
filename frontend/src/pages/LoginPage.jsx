@@ -1,20 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { auth as authApi } from '../api'
 
+const DEFAULT_CLOUD = 'api.mist.com'
+
 export default function LoginPage({ onSuccess }) {
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [mfaCode, setMfaCode]     = useState('')
-  const [mfaToken, setMfaToken]   = useState(null)
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState(null)
+  const [email, setEmail]       = useState('')
+  const [password, setPassword] = useState('')
+  const [cloud, setCloud]       = useState(DEFAULT_CLOUD)
+  const [clouds, setClouds]     = useState([{ host: DEFAULT_CLOUD, label: 'Global 01 (US West)' }])
+  const [mfaCode, setMfaCode]   = useState('')
+  const [mfaToken, setMfaToken] = useState(null)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState(null)
+
+  useEffect(() => {
+    authApi.clouds()
+      .then(data => setClouds(data.clouds))
+      .catch(() => {/* keep default */})
+  }, [])
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      const data = await authApi.login(email, password)
+      const data = await authApi.login(email, password, cloud)
       if (data.mfa_required) {
         setMfaToken(data.mfa_token)
       } else {
@@ -75,6 +85,14 @@ export default function LoginPage({ onSuccess }) {
                 placeholder="••••••••"
                 required
               />
+            </div>
+            <div className="field">
+              <label>Mist Cloud</label>
+              <select value={cloud} onChange={e => setCloud(e.target.value)}>
+                {clouds.map(c => (
+                  <option key={c.host} value={c.host}>{c.label}</option>
+                ))}
+              </select>
             </div>
             <button className="btn btn-primary btn-full" type="submit" disabled={loading}>
               {loading ? <><span className="spinner" /> Signing in…</> : 'Sign in with Mist'}

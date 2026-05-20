@@ -1,74 +1,99 @@
-"""Mist API helpers — always use requests.Session() to keep the cookie jar intact."""
+"""Mist API helpers — always use requests.Session() so the cookie jar is maintained correctly."""
 
 import asyncio
 import requests
 from typing import Optional
-from config import settings
-from session_store import get_csrf
 
-BASE = settings.mist_base
+MIST_CLOUDS = {
+    "api.mist.com":     "Global 01 (US West)",
+    "api.gc1.mist.com": "Global 02 (US West)",
+    "api.ac2.mist.com": "Global 03 (US East)",
+    "api.gc2.mist.com": "Global 04 (Canada)",
+    "api.gc4.mist.com": "Global 05 (Americas)",
+    "api.eu.mist.com":  "EMEA 01 (Frankfurt)",
+    "api.gc3.mist.com": "EMEA 02 (UK)",
+    "api.ac6.mist.com": "EMEA 03 (UAE)",
+    "api.gc6.mist.com": "EMEA 04 (Saudi Arabia)",
+    "api.ac5.mist.com": "APAC 01 (Sydney)",
+    "api.gc5.mist.com": "APAC 02 (India)",
+    "api.gc7.mist.com": "APAC 03 (Japan)",
+}
+DEFAULT_CLOUD = "api.mist.com"
 
 
-# ── run sync requests in thread pool so FastAPI stays async ──────────────────
+def mist_url(cloud_host: str, path: str) -> str:
+    return f"https://{cloud_host}/api/v1{path}"
+
 
 async def _run(fn, *args, **kwargs):
     return await asyncio.to_thread(fn, *args, **kwargs)
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
+# ── Sync helpers (run inside thread pool) ────────────────────────────────────
 
-def _login_sync(email: str, password: str, two_factor: Optional[str] = None):
-    """
-    Login to Mist. Returns (response_json, session, two_factor_required).
-    MFA is a re-POST to /login with all three fields — NOT a separate endpoint.
-    """
-    s = requests.Session()
+def _get_csrf(rs: requests.Session) -> Optional[str]:
+    return next((v for k, v in rs.cookies.items() if k.startswith("csrftoken")), None)
+
+
+def _sync_login(rs: requests.Session, cloud_host: str, email: str,
+                password: str, two_factor: Optional[str] = None):
     body = {"email": email, "password": password}
     if two_factor:
         body["two_factor"] = two_factor
-
-    r = s.post(f"{BASE}/api/v1/login", json=body)
-    r.raise_for_status()
-    data = r.json()
-    return data, s, data.get("two_factor_required", False)
+    return rs.post(mist_url(cloud_host, "/login"), json=body, timeout=15)
 
 
-async def login(email: str, password: str, two_factor: Optional[str] = None):
-    return await _run(_login_sync, email, password, two_factor)
+def _sync_get_self(rs: requests.Session, cloud_host: str) -> dict:
+    sd = rs.get(mist_url(cloud_host, "/self"), timeout=15)
+    return sd.json() if sd.ok else {}
 
 
-# ── Generic API calls ─────────────────────────────────────────────────────────
-
-def _get_sync(session: requests.Session, path: str) -> dict:
-    r = session.get(f"{BASE}{path}")
+def _sync_get(rs: requests.Session, cloud_host: str, path: str) -> dict:
+    r = rs.get(mist_url(cloud_host, path), timeout=30)
     r.raise_for_status()
     return r.json()
 
 
-def _post_sync(session: requests.Session, path: str, body: dict) -> dict:
-    csrf = get_csrf(session)
+def _sync_post(rs: requests.Session, cloud_host: str, path: str, body: dict) -> dict:
+    csrf = _get_csrf(rs)
     headers = {"X-CSRFToken": csrf} if csrf else {}
-    r = session.post(f"{BASE}{path}", json=body, headers=headers)
+    r = rs.post(mist_url(cloud_host, path), json=body, headers=headers, timeout=20)
     r.raise_for_status()
     return r.json()
 
 
-async def api_get(session: requests.Session, path: str) -> dict:
-    return await _run(_get_sync, session, path)
+def _sync_logout(rs: requests.Session, cloud_host: str):
+    try:
+        rs.post(mist_url(cloud_host, "/logout"), timeout=5)
+    except Exception:
+        pass
 
 
-async def api_post(session: requests.Session, path: str, body: dict) -> dict:
-    return await _run(_post_sync, session, path, body)
+# ── Async wrappers ────────────────────────────────────────────────────────────
+
+async def do_login(rs, cloud_host, email, password, two_factor=None):
+    return await _run(_sync_login, rs, cloud_host, email, password, two_factor)
+
+
+async def get_self(rs, cloud_host):
+    return await _run(_sync_get_self, rs, cloud_host)
+
+
+async def api_get(rs, cloud_host, path):
+    return await _run(_sync_get, rs, cloud_host, path)
+
+
+async def api_post(rs, cloud_host, path, body):
+    return await _run(_sync_post, rs, cloud_host, path, body)
+
+
+async def do_logout(rs, cloud_host):
+    await _run(_sync_logout, rs, cloud_host)
 
 
 # ── Domain helpers ────────────────────────────────────────────────────────────
 
-async def get_self(session: requests.Session) -> dict:
-    return await api_get(session, "/api/v1/self")
-
-
 def parse_orgs(self_data: dict) -> list:
-    """Extract org list from the /self privileges array."""
     seen = {}
     for p in self_data.get("privileges", []):
         if p.get("scope") == "org" and p.get("org_id"):
@@ -78,20 +103,21 @@ def parse_orgs(self_data: dict) -> list:
     return list(seen.values())
 
 
-async def get_sites(session: requests.Session, org_id: str) -> list:
-    data = await api_get(session, f"/api/v1/orgs/{org_id}/sites")
-    return [{"id": s["id"], "name": s["name"]} for s in data]
+async def get_sites(rs, cloud_host, org_id):
+    data = await api_get(rs, cloud_host, f"/orgs/{org_id}/sites")
+    sites = data if isinstance(data, list) else data.get("results", [])
+    return [{"id": s["id"], "name": s["name"]} for s in sites]
 
 
-async def get_wireless_clients(session: requests.Session, site_id: str) -> list:
-    data = await api_get(session, f"/api/v1/sites/{site_id}/clients")
+async def get_wireless_clients(rs, cloud_host, site_id):
+    data = await api_get(rs, cloud_host, f"/sites/{site_id}/clients")
     return data if isinstance(data, list) else data.get("results", [])
 
 
-async def get_wired_clients(session: requests.Session, site_id: str) -> list:
-    data = await api_get(session, f"/api/v1/sites/{site_id}/wired_clients")
+async def get_wired_clients(rs, cloud_host, site_id):
+    data = await api_get(rs, cloud_host, f"/sites/{site_id}/wired_clients")
     return data if isinstance(data, list) else data.get("results", [])
 
 
-async def marvis_query(session: requests.Session, org_id: str, query: str) -> dict:
-    return await api_post(session, f"/api/v1/orgs/{org_id}/marvis/search", {"query": query})
+async def marvis_query(rs, cloud_host, org_id, query):
+    return await api_post(rs, cloud_host, f"/orgs/{org_id}/marvis/search", {"query": query})

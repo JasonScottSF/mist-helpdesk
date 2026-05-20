@@ -20,11 +20,12 @@ const get  = (path)        => request('GET',  path)
 const post = (path, body)  => request('POST', path, body)
 
 export const auth = {
-  login:     (email, password) => post('/auth/login',  { email, password }),
-  mfa:       (code, token)     => post('/auth/mfa',    { code, token }),
-  selectOrg: (org_id)          => post('/auth/org',    { org_id }),
-  me:        ()                => get('/auth/me'),
-  logout:    ()                => post('/auth/logout'),
+  clouds:    ()                      => get('/auth/clouds'),
+  login:     (email, password, cloud) => post('/auth/login',  { email, password, cloud }),
+  mfa:       (code, mfa_token)       => post('/auth/mfa',     { code, mfa_token }),
+  selectOrg: (org_id)                => post('/auth/org',     { org_id }),
+  me:        ()                      => get('/auth/me'),
+  logout:    ()                      => post('/auth/logout'),
 }
 
 export const sites = {
@@ -37,7 +38,7 @@ export const clients = {
 }
 
 export const marvis = {
-  query:       (query)       => post('/marvis/query',       { query }),
-  suggestions: (params)      => post('/marvis/suggestions', params),
-  categories:  ()            => get('/marvis/categories'),
+  query:       (query)  => post('/marvis/query',       { query }),
+  suggestions: (params) => post('/marvis/suggestions', params),
+  categories:  ()       => get('/marvis/categories'),
 }

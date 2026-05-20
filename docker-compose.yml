@@ -3,13 +3,8 @@ services:
     build: ./api
     restart: unless-stopped
     environment:
-      REDIS_URL: redis://redis:6379
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
-      MIST_BASE: ${MIST_BASE:-https://api.mist.com}
       SESSION_TTL: ${SESSION_TTL:-28800}
-    depends_on:
-      redis:
-        condition: service_healthy
     networks:
       - internal
 
@@ -17,27 +12,11 @@ services:
     build: ./frontend
     restart: unless-stopped
     ports:
-      - "${PORT:-8080}:80"
+      - "${PORT:-5004}:80"
     depends_on:
       - api
     networks:
       - internal
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - internal
-
-volumes:
-  redis_data:
 
 networks:
   internal:

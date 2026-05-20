@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Cookie, HTTPException
 from typing import Optional
 import mist_client
-from session_store import get_session, build_requests_session
+from session_store import get_session
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ def _require_session(hd_session: Optional[str]):
     if not hd_session:
         raise HTTPException(status_code=401, detail="Not authenticated")
     sess = get_session(hd_session)
-    if not sess:
+    if not sess or not sess.get("authenticated"):
         raise HTTPException(status_code=401, detail="Session expired")
     return sess
 
@@ -26,9 +26,10 @@ def _slim(client: dict, fields: list) -> dict:
 @router.get("/{site_id}/wireless")
 async def wireless_clients(site_id: str, hd_session: Optional[str] = Cookie(None)):
     sess = _require_session(hd_session)
-    mist = build_requests_session(sess)
+    rs = sess["requests_session"]
+    cloud = sess["cloud_host"]
     try:
-        clients = await mist_client.get_wireless_clients(mist, site_id)
+        clients = await mist_client.get_wireless_clients(rs, cloud, site_id)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Mist API error: {e}")
     return {"clients": [_slim(c, WIRELESS_FIELDS) for c in clients]}
@@ -37,9 +38,10 @@ async def wireless_clients(site_id: str, hd_session: Optional[str] = Cookie(None
 @router.get("/{site_id}/wired")
 async def wired_clients(site_id: str, hd_session: Optional[str] = Cookie(None)):
     sess = _require_session(hd_session)
-    mist = build_requests_session(sess)
+    rs = sess["requests_session"]
+    cloud = sess["cloud_host"]
     try:
-        clients = await mist_client.get_wired_clients(mist, site_id)
+        clients = await mist_client.get_wired_clients(rs, cloud, site_id)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Mist API error: {e}")
     return {"clients": [_slim(c, WIRED_FIELDS) for c in clients]}
