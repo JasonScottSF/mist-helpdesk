@@ -35,20 +35,18 @@ async def query(req: QueryRequest, hd_session: Optional[str] = Cookie(None)):
     rs = sess["requests_session"]
     cloud = sess["cloud_host"]
 
-    params = {}
-    if req.troubleshoot_type == "client":
-        if not req.mac:
-            raise HTTPException(status_code=400, detail="mac is required for client troubleshoot")
-        params["mac"] = req.mac
-    else:
-        if not req.site_id:
-            raise HTTPException(status_code=400, detail="site_id is required for site troubleshoot")
-        params["site_id"] = req.site_id
-        if req.troubleshoot_type in ("wired", "wan"):
-            params["type"] = req.troubleshoot_type
+    if req.troubleshoot_type == "client" and not req.mac:
+        raise HTTPException(status_code=400, detail="mac is required for client troubleshoot")
+    if req.troubleshoot_type != "client" and not req.site_id:
+        raise HTTPException(status_code=400, detail="site_id is required for site troubleshoot")
 
     try:
-        result = await mist_client.marvis_troubleshoot(rs, cloud, sess["org_id"], params)
+        result = await mist_client.marvis_troubleshoot(
+            rs, cloud, sess["org_id"],
+            req.troubleshoot_type,
+            mac=req.mac,
+            site_id=req.site_id,
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Marvis error: {e}")
     return result

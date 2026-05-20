@@ -131,11 +131,23 @@ async def get_wired_clients(rs, cloud_host, org_id, site_id):
     ]
 
 
-def _sync_troubleshoot(rs: requests.Session, cloud_host: str, org_id: str, params: dict) -> dict:
-    r = rs.get(mist_url(cloud_host, f"/orgs/{org_id}/insights/troubleshoot"), params=params, timeout=30)
+def _sync_troubleshoot(rs: requests.Session, cloud_host: str, org_id: str,
+                       troubleshoot_type: str, mac: str = None, site_id: str = None) -> dict:
+    if troubleshoot_type == "client":
+        url = mist_url(cloud_host, f"/orgs/{org_id}/troubleshoot")
+        params = {"mac": mac}
+    else:
+        url = mist_url(cloud_host, f"/sites/{site_id}/troubleshoot")
+        params = {}
+        if troubleshoot_type in ("wired", "wan"):
+            params["type"] = troubleshoot_type
+    r = rs.get(url, params=params, timeout=30)
     r.raise_for_status()
-    return r.json()
+    ct = r.headers.get("content-type", "")
+    if "json" in ct:
+        return r.json()
+    return {"data": {"results": [{"text": r.text}]}}
 
 
-async def marvis_troubleshoot(rs, cloud_host, org_id, params: dict):
-    return await _run(_sync_troubleshoot, rs, cloud_host, org_id, params)
+async def marvis_troubleshoot(rs, cloud_host, org_id, troubleshoot_type, mac=None, site_id=None):
+    return await _run(_sync_troubleshoot, rs, cloud_host, org_id, troubleshoot_type, mac, site_id)
